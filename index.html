@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cuadrante CNP v4.3</title>
+    <title>Cuadrante CNP v4.4</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1e3a8a">
     
@@ -22,6 +22,7 @@
             --evt-ap: #9333ea;           --evt-ap-ant: #d8b4fe;       --evt-comp: #f59e0b;
             --evt-navidad: #b45309;      --evt-ssanta: #7e22ce;       --evt-baja: #374151;
             --evt-nota: #0ea5e9;         --evt-otros: #db2777;        --evt-festivo: #ef4444;
+            --evt-incidencia: #c2410c; /* Color Rojo Teja para Incidencias */
         }
 
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; padding-bottom: 80px; }
@@ -45,6 +46,7 @@
         .btn-backup { background: #059669; color: white; font-size: 0.8rem; padding: 5px 10px; }
         .btn-restore { background: #d97706; color: white; font-size: 0.8rem; padding: 5px 10px; }
         .btn-danger { background: #ef4444; color: white; }
+        .btn-sec { background: var(--secondary); color: white; }
 
         /* CALENDARIO */
         .calendar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
@@ -62,15 +64,15 @@
         
         /* NUMEROS DE DÍA */
         .day-num { font-weight: 700; z-index: 2; position: absolute; top: 4px; left: 5px; font-size: 0.8rem; }
-        .num-weekend { color: #ff0000 !important; } /* Rojo brillante para fines de semana */
+        .num-weekend { color: #ff0000 !important; }
 
         /* INFO DEL EVENTO */
         .day-info { font-size: 0.65rem; z-index: 2; text-align: center; margin-top: 10px; line-height: 1; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
         
-        /* TURNO ORIGINAL (Esquina inferior derecha) */
+        /* TURNO ORIGINAL */
         .base-shift { position: absolute; bottom: 2px; right: 4px; font-size: 0.65rem; font-weight: bold; opacity: 0.7; z-index: 1; color: inherit; }
 
-        /* ESTILOS DE TURNOS BASE */
+        /* ESTILOS DE TURNOS */
         .t-M { background: var(--t-m); color: var(--t-m-text); }
         .t-T { background: var(--t-t); color: var(--t-t-text); }
         .t-N { background: var(--t-n); color: var(--t-n-text); }
@@ -90,6 +92,7 @@
         .evt-NOTA { background: var(--evt-nota); color: white; }
         .evt-OTROS { background: var(--evt-otros); color: white; }
         .evt-FESTIVO { background: var(--evt-festivo); color: white; border: 2px solid white; }
+        .evt-INCIDENCIA { background: var(--evt-incidencia); color: white; }
 
         /* UI ELEMENTS */
         #customPatternBox { background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe; margin-top: 10px; display: none; }
@@ -105,7 +108,7 @@
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
         .hidden { display: none; }
 
-        /* Layout Grid para Juicios (FIX) */
+        /* LAYOUTS ESPECIFICOS */
         .row-juicio { display: grid; grid-template-columns: 100px 1fr; gap: 15px; margin-bottom: 10px; }
         .modal-field-group { margin-bottom: 10px; }
         .modal-field-group label { color: #64748b; font-size: 0.75rem; }
@@ -183,6 +186,7 @@
                     <option value="">-- Turno Calculado (Restablecer) --</option>
                     <option value="JUICIO">⚖️ Juicio</option>
                     <option value="NOTA">📝 Nota Personal</option>
+                    <option value="INCIDENCIA">⚠️ Incidencia</option>
                     <option value="FESTIVO">🔴 Festivo (No Laboral)</option>
                     <option disabled>--- Permisos ---</option>
                     <option value="AP">🟣 Asuntos Propios</option>
@@ -213,6 +217,7 @@
                     <label>Procedimiento / Atestado:</label>
                     <input type="text" id="evtCase" placeholder="Ej: DP 123/2024">
                 </div>
+                <button class="btn-sec" onclick="app.downloadICS()" style="margin-top:5px; background:#475569; color:white; font-size:0.8rem; width:100%;">📅 Añadir a mi Agenda Móvil</button>
             </div>
 
             <div id="fieldsCommon" class="hidden">
@@ -252,7 +257,8 @@ window.app = {
         'JUICIO': 'Juicio', 'VACACIONES': 'Vacac.', 'VAC_ANT': 'Vac.Ant',
         'AP': 'AP', 'AP_ANT': 'AP Ant', 'COMPENSACION': 'Comp.',
         'NAVIDAD': 'Navidad', 'SSANTA': 'S.Santa', 'BAJA': 'Baja',
-        'NOTA': 'Nota', 'OTROS': 'Perm/Lic', 'FESTIVO': 'Festivo'
+        'NOTA': 'Nota', 'OTROS': 'Perm/Lic', 'FESTIVO': 'Festivo',
+        'INCIDENCIA': 'Incid.'
     },
     currentDate: null,
 
@@ -336,10 +342,8 @@ window.app = {
 
             cell.onclick = function() { window.app.openModal(dateStr); };
 
-            // Renderizado
             let contentHtml = `<div class="${numClass}">${d}</div>`;
             
-            // Si hay evento manual
             if (this.data.events[dateStr]) {
                 const evt = this.data.events[dateStr];
                 cell.classList.add(`evt-${evt.type}`);
@@ -348,11 +352,9 @@ window.app = {
                 if(evt.type==='JUICIO' && evt.time) txt = evt.time;
                 
                 contentHtml += `<div class="day-info">${txt}</div>`;
-                // Mostrar turno original pequeñito
                 if(baseCode) contentHtml += `<div class="base-shift">${baseCode}</div>`;
                 
             } else {
-                // Si NO hay evento, mostrar turno normal
                 if (diff >= 0) {
                     cell.classList.add(`t-${baseCode}`);
                     contentHtml += `<div class="day-info">${baseCode}</div>`;
@@ -382,13 +384,42 @@ window.app = {
         this.render();
     },
     
+    // EXPORTAR A CALENDARIO (ICS)
+    downloadICS: function() {
+        const date = this.currentDate;
+        const time = document.getElementById('evtTime').value || "09:00";
+        const court = document.getElementById('evtCourt').value || "Juzgado";
+        const exp = document.getElementById('evtCase').value || "";
+        
+        if(!date) return;
+        const startStr = date.replace(/-/g, '') + 'T' + time.replace(/:/g, '') + '00';
+        // Duración default 2h
+        let h = parseInt(time.split(':')[0]) + 2;
+        const endStr = date.replace(/-/g, '') + 'T' + String(h).padStart(2,'0') + time.split(':')[1] + '00';
+
+        const title = `JUICIO: ${court}`;
+        const desc = `Procedimiento: ${exp}. Recordatorio App Cuadrante.`;
+        
+        const ics = [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CuadranteCNP//ES',
+            'BEGIN:VEVENT', `DTSTART:${startStr}`, `DTEND:${endStr}`,
+            `SUMMARY:${title}`, `DESCRIPTION:${desc}`, `LOCATION:${court}`,
+            'END:VEVENT', 'END:VCALENDAR'
+        ].join('\n');
+
+        const b = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = window.URL.createObjectURL(b);
+        a.download = `juicio_${date}.ics`;
+        document.body.appendChild(a); a.click(); a.remove();
+    },
+
     // MODAL
     openModal: function(d) {
         this.currentDate = d;
         document.getElementById('modalOverlay').style.display = 'flex';
         document.getElementById('modalTitle').innerText = d;
         
-        // Reset
         document.getElementById('evtType').value = "";
         ['evtTime','evtCourt','evtCase','evtNote'].forEach(id => document.getElementById(id).value = "");
         
