@@ -304,20 +304,23 @@ window.app = {
             if (!startDateStr) return;
 
             let sequence = (patternKey === 'CUSTOM') ? (this.data.config.customSeq || ['L']) : this.patterns[patternKey];
-            const startDt = new Date(startDateStr);
+            
+            // CORRECCIÓN DST: Usar UTC absoluto para evitar desajustes en el cambio de hora
+            const parts = startDateStr.split('-');
+            const startDtUTC = Date.UTC(parts[0], parts[1] - 1, parts[2]);
+
             const today = new Date();
             let loopDate = new Date(today.getFullYear(), today.getMonth(), 1);
             
-            // 60 meses = 5 Años
             for(let i=0; i<60; i++) {
-                container.appendChild(this.createMonth(loopDate.getFullYear(), loopDate.getMonth(), startDt, sequence));
+                container.appendChild(this.createMonth(loopDate.getFullYear(), loopDate.getMonth(), startDtUTC, sequence));
                 loopDate.setMonth(loopDate.getMonth() + 1);
             }
             this.renderStats();
         } catch (e) { alert("Error render: " + e.message); }
     },
 
-    createMonth: function(year, month, startDt, sequence) {
+    createMonth: function(year, month, startDtUTC, sequence) {
         const names = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
         const card = document.createElement('div');
         card.className = 'month-card';
@@ -338,20 +341,19 @@ window.app = {
             const cell = document.createElement('div');
             cell.className = 'day-cell';
             
-            // Comprobar si es el DÍA DE HOY
             const isToday = (year === todayObj.getFullYear() && month === todayObj.getMonth() && d === todayObj.getDate());
             if (isToday) {
                 cell.classList.add('day-today');
             }
             
-            // Detectar Fin de Semana
             const currentDt = new Date(year, month, d);
             const isWeekend = (currentDt.getDay() === 0 || currentDt.getDay() === 6);
             const numClass = isWeekend ? 'day-num num-weekend' : 'day-num';
 
-            // Calcular turno base SIEMPRE (para mostrarlo debajo)
+            // CORRECCIÓN DST: Comparación estricta en UTC
+            const currentDtUTC = Date.UTC(year, month, d);
             let baseCode = '';
-            const diff = Math.floor((currentDt - startDt) / 86400000);
+            const diff = Math.floor((currentDtUTC - startDtUTC) / 86400000);
             if (diff >= 0) {
                 baseCode = sequence[diff % sequence.length];
             }
@@ -386,7 +388,6 @@ window.app = {
         return card;
     },
 
-    // HANDLERS
     handlePatternChange: function() {
         const val = document.getElementById('patternSelect').value;
         document.getElementById('customPatternBox').style.display = (val === 'CUSTOM') ? 'block' : 'none';
@@ -400,7 +401,6 @@ window.app = {
         this.render();
     },
     
-    // EXPORTAR A CALENDARIO (ICS)
     downloadICS: function() {
         const date = this.currentDate;
         const time = document.getElementById('evtTime').value || "09:00";
@@ -409,7 +409,6 @@ window.app = {
         
         if(!date) return;
         const startStr = date.replace(/-/g, '') + 'T' + time.replace(/:/g, '') + '00';
-        // Duración default 2h
         let h = parseInt(time.split(':')[0]) + 2;
         const endStr = date.replace(/-/g, '') + 'T' + String(h).padStart(2,'0') + time.split(':')[1] + '00';
 
@@ -430,7 +429,6 @@ window.app = {
         document.body.appendChild(a); a.click(); a.remove();
     },
 
-    // MODAL
     openModal: function(d) {
         this.currentDate = d;
         document.getElementById('modalOverlay').style.display = 'flex';
@@ -489,7 +487,6 @@ window.app = {
         this.closeModal(); this.render();
     },
 
-    // TOOLS
     toggleStats: function() {
         const p = document.getElementById('statsPanel');
         p.style.display = p.style.display==='block' ? 'none' : 'block';
